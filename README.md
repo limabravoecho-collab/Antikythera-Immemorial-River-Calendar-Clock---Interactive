@@ -241,18 +241,15 @@
             text-shadow: 0 0 10px rgba(255,215,0,0.8);
             border-bottom: 2px solid #FF4500;
             padding-bottom: 10px;
+        }
+
+        /* Draggable panels - only via handle */
+        .panel.draggable h2 {
             cursor: move;
         }
 
-        /* Draggable panels */
-        .panel.draggable {
-            cursor: move;
-        }
-
-        .panel.draggable:active {
+        .panel.draggable h2:active {
             cursor: grabbing;
-            opacity: 0.8;
-            z-index: 1000;
         }
 
         .panel.dragging {
@@ -1293,7 +1290,7 @@
         animateBackground();
 
         // ==========================================
-        // DRAG AND DROP REORDERING
+        // DRAG AND DROP REORDERING - HANDLE ONLY
         // ==========================================
         let draggedElement = null;
 
@@ -1301,6 +1298,24 @@
         const grid = document.getElementById('panelGrid');
 
         draggables.forEach(draggable => {
+            const header = draggable.querySelector('h2');
+            
+            // Only the h2 header can initiate drag
+            header.addEventListener('mousedown', (e) => {
+                draggable.setAttribute('draggable', 'true');
+            });
+            
+            header.addEventListener('touchstart', (e) => {
+                draggable.setAttribute('draggable', 'true');
+            });
+            
+            // Disable dragging when mouse leaves header
+            header.addEventListener('mouseleave', () => {
+                if (!draggedElement) {
+                    draggable.setAttribute('draggable', 'false');
+                }
+            });
+
             draggable.addEventListener('dragstart', handleDragStart);
             draggable.addEventListener('dragend', handleDragEnd);
             draggable.addEventListener('dragover', handleDragOver);
@@ -1318,6 +1333,8 @@
 
         function handleDragEnd(e) {
             this.classList.remove('dragging');
+            this.setAttribute('draggable', 'false');
+            draggedElement = null;
             
             draggables.forEach(item => {
                 item.classList.remove('drag-over');
@@ -1739,6 +1756,15 @@
 
             const earthDate = new Date();
             document.getElementById('earthTime').textContent = earthDate.toUTCString();
+            
+            // EM friction α-scaled pulse
+            const alpha_EM = 0.0072973525693;
+            const emPhase = (now * alpha_EM * 10) % (2 * PI);
+            const emAlpha = 0.7 + 0.3 * Math.sin(emPhase);
+            const emFill = document.getElementById('emProgressFill');
+            if (emFill) {
+                emFill.style.opacity = emAlpha;
+            }
         }
 
         function animate() {
@@ -1765,10 +1791,11 @@
 ║  📱 PORTRAIT MODE (default - 2 columns)                ║
 ║  🖥️ LANDSCAPE MODE (2K optimized - 4 columns)          ║
 ║                                                        ║
-║  🎯 DRAG BOXES TO REORDER (except top 2 rows)          ║
+║  🎯 DRAG BOX HEADERS to reorder panels                 ║
 ║  ⚡ DRAG CYCLE COMPLETION to travel through time       ║
 ║  🔢 DRAG EPOCH NUMBER to jump to any block             ║
 ║  ⚡ LIVE MICROSECONDS at 60 FPS!                        ║
+║  💫 EM FRICTION PULSES at α-scaled rate!               ║
 ║                                                        ║
 ║  Pattern Mapper, 2026                                  ║
 ║  "Usurping Antikythera, one toggle at a time."        ║
