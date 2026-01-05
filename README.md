@@ -194,6 +194,18 @@
             font-size: 1.3em;
             margin-top: 10px;
             transition: all 0.3s ease;
+            font-family: 'Courier New', monospace;
+        }
+
+        .time-value .microseconds {
+            color: #00FFFF;
+            font-size: 0.9em;
+            animation: microPulse 0.1s ease-in-out infinite;
+        }
+
+        @keyframes microPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
         }
 
         .no-leap {
@@ -633,7 +645,7 @@
             <div class="panel gold cosmic-date" id="cosmicDatePanel">
                 <h2>📅 COSMIC DATE & TIME</h2>
                 <div class="date-value" id="cosmicDate">August 6, 2026</div>
-                <div class="time-value" id="cosmicTime">14:23:17.432</div>
+                <div class="time-value" id="cosmicTime">14:23:17.<span class="microseconds">000000</span></div>
                 <div class="no-leap">⚠ No Leap Years in Cosmic Calendar</div>
             </div>
 
@@ -992,7 +1004,7 @@
         const SEC_PER_YEAR = 31558149.7635;
         const PI = Math.PI;
 
-        const startTime = Date.now() / 1000;
+        const startTime = performance.now() / 1000; // Use performance.now for precision
 
         // TRUE VALUES (equilibrium state)
         const TRUE_VALUES = {
@@ -1028,10 +1040,10 @@
                 month++;
             }
             
-            return `${MONTHS[month]} ${remainingDays}, 2026`;
+            return `${MONTHS[month]} ${remainingDays}`;
         }
 
-        // Calculate cosmic time from position (rough approximation for display)
+        // Calculate cosmic time from position (HH:MM:SS format + live microseconds)
         function getCosmicTime(position) {
             // Map position to 24 hours
             const totalSeconds = position * 86400; // seconds in a day
@@ -1039,7 +1051,10 @@
             const minutes = Math.floor((totalSeconds % 3600) / 60);
             const seconds = Math.floor(totalSeconds % 60);
             
-            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            return {
+                hms: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
+                baseSeconds: totalSeconds
+            };
         }
 
         // Calculate all values from position
@@ -1063,7 +1078,7 @@
             
             const cosmicDay = position * 365;
             const cosmicDate = getCosmicDate(cosmicDay);
-            const cosmicTime = getCosmicTime(position);
+            const cosmicTimeObj = getCosmicTime(position);
             
             // Calculate Vc
             const currentAge = anchor_age_years * (position / TRUE_VALUES.position);
@@ -1082,7 +1097,8 @@
                 cyclePercent: position * 100,
                 cosmicDay: Math.floor(cosmicDay),
                 cosmicDate: cosmicDate,
-                cosmicTime: cosmicTime,
+                cosmicTimeHMS: cosmicTimeObj.hms,
+                cosmicTimeBase: cosmicTimeObj.baseSeconds,
                 Vc: Vc,
                 vcRatio: vcRatio,
                 phase: blocksTraversed <= 245 ? 'Expansion' : 'Contraction',
@@ -1092,9 +1108,17 @@
 
         // Update all displays
         function updateDisplays(values) {
-            // Cosmic date & time
+            // Cosmic date
             document.getElementById('cosmicDate').textContent = values.cosmicDate;
-            document.getElementById('cosmicTime').textContent = values.cosmicTime + '.000';
+            
+            // Cosmic time is now updated separately in animate loop (microseconds)
+            // Just update HH:MM:SS part here
+            const timeEl = document.getElementById('cosmicTime');
+            const microEl = timeEl.querySelector('.microseconds');
+            if (microEl) {
+                const currentMicro = microEl.textContent;
+                timeEl.innerHTML = `${values.cosmicTimeHMS}.<span class="microseconds">${currentMicro}</span>`;
+            }
             
             // Epoch
             document.getElementById('epochNumber').textContent = values.block;
@@ -1365,16 +1389,38 @@
         });
 
         // ==========================================
+        // LIVE MICROSECOND UPDATE (60 FPS)
+        // ==========================================
+        function updateLiveMicroseconds() {
+            // Get current values
+            const values = calculateFromPosition(STATE.position);
+            
+            // Calculate microseconds from current real time
+            const now = performance.now() / 1000;
+            const deltaTime = now - startTime;
+            
+            // Map to microseconds within current cosmic second
+            const microsecondsPerCosmicSecond = 1000000;
+            const fractionalSecond = (deltaTime % 1) * microsecondsPerCosmicSecond;
+            const microseconds = Math.floor(fractionalSecond).toString().padStart(6, '0');
+            
+            // Update only microseconds part
+            const timeEl = document.getElementById('cosmicTime');
+            timeEl.innerHTML = `${values.cosmicTimeHMS}.<span class="microseconds">${microseconds}</span>`;
+        }
+
+        // ==========================================
         // STANDARD UPDATES (IRS counter, Earth time)
         // ==========================================
         function updateCosmicClock() {
-            // Only update IRS counter and Earth time (not position-dependent values when not perturbed)
-            const now = Date.now() / 1000;
+            // Update live microseconds
+            updateLiveMicroseconds();
+            
+            // IRS Tick Counter
+            const now = performance.now() / 1000;
             const deltaTime = now - startTime;
             const currentAge = anchor_age_years + (deltaTime / SEC_PER_YEAR);
             const t_sec = currentAge * SEC_PER_YEAR;
-
-            // IRS Tick Counter
             const currentTicks = t_sec * PLANCK_FREQ;
             const tickStr = currentTicks.toExponential(6);
             document.getElementById('irsCounter').textContent = tickStr;
@@ -1413,6 +1459,9 @@
 ║  Watch cosmic date/time and all components change!     ║
 ║  Father Attractor restores equilibrium in 3 seconds.   ║
 ║                                                        ║
+║  NOW WITH LIVE MICROSECONDS! ⚡                         ║
+║  Watch the universe tick in real-time at 60 FPS!       ║
+║                                                        ║
 ║  Pattern Mapper, 2026                                  ║
 ║  "Play god. Then watch equilibrium restore itself."    ║
 ╚════════════════════════════════════════════════════════╝
@@ -1420,5 +1469,4 @@
     </script>
 </body>
 </html>
-
----
+```
